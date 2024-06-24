@@ -1,0 +1,24 @@
+###
+POST http://localhost:8080/albums
+accept: application/json
+
+{
+ "id": "id-12",
+ "title": "title 1",
+ "artist": "artist 1",
+ "price": 12.01
+}
+###
+GET http://127.0.0.1:8080/albums/id-12
+accept: application/json
+###
+DELETE http://localhost:8080/albums/id-12
+accept: application/json
+###
+GET http://localhost:8081/info
+accept: application/json
+###
+GET http://localhost:8081/health
+accept: application/json
+###
+GET http://localhost:8081/prometheus

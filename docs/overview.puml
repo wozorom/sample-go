@@ -1,0 +1,44 @@
+@startuml
+
+participant go as "Go app"
+participant cs as "Configuration service \n (wiremock)"
+participant eur as "Eureka"
+participant es as "External service \n (wiremock)"
+database aer as "Aerospike"
+queue kafka as "Kafka topic \n (albums)"
+
+=== App startup ==
+
+[-> go : start application
+go -> cs: Fetch configs using REST
+go -> aer: Bootstrap aerospike client
+go -> kafka: Bootstrap kafka producer
+go -> kafka: Bootstrap kafka consumer
+go -> go: Bootstrap web bindings 8080
+go -> go: Bootstrap web bindings 8081
+go -> eur: Register with status STARTING
+
+=== PostAlbum ==
+[-> go : POST
+go -> aer: Save with id
+go --> kafka: Produce payload
+[<- go : Respond
+
+=== GetAlbumByID ==
+[-> go : GET
+go -> aer: Get by id
+go -> es: Make remote call
+[<- go : Respond
+
+=== DeleteAlbumByID ==
+[-> go : DELETE
+go -> aer: Delete by id
+[<- go : Respond
+
+=== Kafka consumer routine ==
+loop
+go --> kafka: Consume message
+go -> go: Print body to console
+end loop
+
+@enduml

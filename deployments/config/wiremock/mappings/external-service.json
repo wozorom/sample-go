@@ -1,0 +1,24 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/external-path"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "name": "sample response",
+      "boolValue": true,
+      "numberValue": 123123123123,
+      "collection": [
+        {
+          "internalObject": {
+            "value": "yes"
+          }
+        }
+      ],
+      "object": {
+        "objectValue": "no"
+      }
+    }
+  }
+}

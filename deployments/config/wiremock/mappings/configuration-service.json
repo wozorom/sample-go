@@ -1,0 +1,65 @@
+{
+  "request": {
+    "method": "GET",
+    "urlPath": "/sample-go/stage,studio/master"
+  },
+  "response": {
+    "status": 200,
+    "jsonBody": {
+      "name": "sample-go",
+      "profiles": [
+        "studio"
+      ],
+      "label": "master",
+      "version": null,
+      "state": null,
+      "propertySources": [
+        {
+          "name": "overrides",
+          "source": {
+            "KUBERNETES_NAMESPACE": "preprodbeta-msaas"
+          }
+        },
+        {
+          "name": "vault:application",
+          "source": {
+          }
+        },
+        {
+          "name": "git@github-dr.playticorp.com:company/msaas-versions.git/configuration/settings/application-studio.yml",
+          "source": {
+            "GAME_TYPE": "msaas",
+            "GAME_TYPE_ID": 1767,
+            "KAFKA_BROKER": "kafka-all-broker",
+            "KAFKA_BROKER_SASL_PORT": 29095,
+            "KAFKA_SASL_USER": "shm-user",
+            "KAFKA_BROKER_PORT": 29095,
+            "KAFKA_URL": "${KAFKA_BROKER}:${KAFKA_BROKER_PORT}",
+            "KAFKA_SASL_URL": "${KAFKA_BROKER}:${KAFKA_BROKER_SASL_PORT}"
+          }
+        },
+        {
+          "name": "git@github-dr.playticorp.com:company/msaas-versions.git/configuration/settings/ticket-service/ticket-service.yml",
+          "source": {
+            "spring.profiles.include": "shmTenants"
+          }
+        },
+        {
+          "name": "git@github-dr.playticorp.com:company/msaas-versions.git/configuration/settings/application.yml",
+          "source": {
+            "GAME_TYPE": "psf",
+            "namespace.helm3Enabled": true,
+            "namespace.istioAutoInjectLabel": false,
+            "spring.profiles.include": "logging",
+            "spring.profiles.dictionary": "logging",
+            "spring.profiles.service": "logging",
+            "spring.profiles.psf-type": "classic"
+          }
+        }
+      ]
+    },
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  }
+}

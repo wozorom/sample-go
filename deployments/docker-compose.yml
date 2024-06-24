@@ -1,0 +1,213 @@
+version: '3.8'
+
+services:
+
+  elasticsearch:
+    networks:
+      app-net: {}
+    image: elasticsearch:7.9.1
+    platform: linux/amd64
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch_data:/var/lib/elasticsearch/data/:rw
+      - ./config/elk/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    environment:
+      - discovery.type=single-node
+      - http.host=0.0.0.0
+      - transport.host=0.0.0.0
+      - xpack.security.enabled=false
+      - xpack.monitoring.collection.enabled=false
+      - xpack.monitoring.enabled=false
+      - cluster.name=elasticsearch
+      - bootstrap.memory_lock=true
+
+  logstash:
+    networks:
+      app-net: {}
+    image: logstash:8.12.2
+    ports:
+      - "5044:5044/udp"
+      - "9600:9600"
+    volumes:
+      - ./config/elk/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - ./config/elk/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - logstash_data:/usr/share/logstash/data
+    depends_on:
+      - elasticsearch
+
+  kibana:
+    networks:
+      app-net: {}
+    image: kibana:7.9.1
+    platform: linux/amd64
+    ports:
+      - "5601:5601"
+    volumes:
+      - ./config/elk/kibana.yml:/usr/share/kibana/config/kibana.yml
+      - kibana_data:/usr/share/kibana/data
+    depends_on:
+      - elasticsearch
+
+  prometheus:
+    networks:
+      app-net: {}
+    image: prom/prometheus:v2.26.0
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/bitnami
+    ports:
+      - '9090:9090'
+
+  grafana:
+    networks:
+      app-net: {}
+    image: grafana/grafana:10.2.4
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: admin
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./config/grafana/dashboard.yaml:/etc/grafana/provisioning/dashboards/main.yaml
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/bitnami
+    depends_on:
+      - prometheus
+
+  wiremock:
+    networks:
+      app-net: {}
+    platform: linux/amd64
+    image: wiremock/wiremock:3.4.1-2-alpine
+    volumes:
+      - ./config/wiremock/mappings:/home/wiremock/mappings
+    entrypoint: [ "/docker-entrypoint.sh", "--global-response-templating", "--verbose", "--port", "53347" ]
+    ports:
+      - '53347:53347'
+
+  zookeeper:
+    networks:
+      app-net: {}
+    image: docker.io/confluentinc/cp-zookeeper:7.2.1
+    volumes:
+      - zookeeper_data:/bitnami
+    environment:
+      - ZOOKEEPER_CLIENT_PORT=2181
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka-ui:
+    networks:
+      app-net: {}
+    image: provectuslabs/kafka-ui:latest
+    depends_on:
+      - kafka
+    ports:
+      - "4000:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+
+  kafka:
+    networks:
+      app-net: {}
+    image: docker.io/confluentinc/cp-kafka:7.6.0
+    restart: unless-stopped
+    volumes:
+      - kafka_data:/bitnami
+    environment:
+      - KAFKA_NUM_PARTITIONS=1
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INSIDE:PLAINTEXT,OUTSIDE:PLAINTEXT
+      - KAFKA_LISTENERS=INSIDE://:9092,OUTSIDE://:9094
+      - KAFKA_ADVERTISED_HOST_NAME:localhost
+      - KAFKA_ADVERTISED_LISTENERS=INSIDE://localhost:9092,OUTSIDE://localhost:9094
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INSIDE
+      - KAFKA_CREATE_TOPICS="albums:1:1"
+    depends_on:
+      - zookeeper
+    ports:
+      - '9092:9092'
+      - '9094:9094'
+
+  eureka:
+    networks:
+      app-net: {}
+    image: dtimchenko/eureka-server:latest
+    container_name: eureka
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  aerospike:
+    networks:
+      app-net: {}
+    image: docker.io/aerospike/aerospike-server:6.2.0.15
+    environment:
+      - NAMESPACE=test
+    ports:
+      - '3000:3000'
+
+  sample-go:
+    networks:
+      app-net: {}
+    platform: linux/amd64
+    restart: on-failure
+    image: sample-go:latest
+    environment:
+      GOMAXPROCS: 2
+      EUREKA_ADDR: http://eureka:8761/eureka
+      LOG_URL: logstash:5044
+      REMOTE_URL: http://wiremock:53347/external-path
+      CONFIG_SERVER_URL: http://wiremock:53347/sample-go/stage,studio/master
+      LOCAL_IP: sample-go
+      APP_NAME: sample-go
+      AEROSPIKE_HOST: aerospike
+      KAFKA_URL: kafka:9092
+    deploy:
+      resources:
+        limits:
+          cpus: '1.1'
+          memory: 1G
+        reservations:
+          cpus: '1.0'
+          memory: 512M
+    ports:
+      - '8080:8080'
+      - '8081:8081'
+    depends_on:
+      - aerospike
+      - kafka
+      - wiremock
+      - eureka
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  logstash_data:
+    driver: local
+  kibana_data:
+    driver: local
+
+networks:
+  app-net:
+    driver: bridge
+    name: app-net
+    enable_ipv6: false
+
